@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>BFDI-Style Challenge 3D</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="game-wrap">
+      <h1>BFDI-Style Challenge 3D <span class="build-tag">Build v14</span></h1>
+      <p class="subtitle">Pick one character to control and play at your own pace.</p>
+
+      <section class="character-select" aria-label="Character selection">
+        <h2>Choose Your Character</h2>
+        <div id="characterPicker" class="picker"></div>
+        <p id="characterInfo" class="character-info"></p>
+        <canvas id="facePreview" width="180" height="120" aria-label="Character face preview"></canvas>
+      </section>
+
+      <section class="hud">
+        <div><strong>Character:</strong> <span id="characterName">Leafy Classic</span></div>
+        <div><strong>Round:</strong> <span id="roundNum">1</span></div>
+        <div><strong>Contestants Left:</strong> <span id="remainingCount">6</span></div>
+        <div><strong>Score:</strong> <span id="score">0</span></div>
+        <div><strong>Time:</strong> <span id="time">45</span>s</div>
+      </section>
+
+      <div id="scene" aria-label="3D game area"></div>
+
+      <section class="controls">
+        <p><strong>Move:</strong> Arrow keys, WASD, or drag the phone wheel</p>
+        <div class="control-buttons">
+          <button id="restart">Restart Round</button>
+          <button id="nextRound" disabled>Next Round</button>
+        </div>
+      </section>
+
+      <section class="multiplayer-panel" aria-label="Multiplayer room">
+        <p class="multiplayer-title"><strong>Multiplayer Room</strong></p>
+        <p class="multiplayer-line">
+          Status: <span id="multiplayerStatus">Connecting...</span> | Players online: <span id="multiplayerCount">1</span>
+        </p>
+        <button id="copyRoomLink" type="button">Copy Join Link</button>
+      </section>
+
+      <section id="adminPanel" class="admin-panel" aria-label="Admin controls">
+        <p class="admin-title"><strong>Admin Powers</strong></p>
+        <div class="control-buttons">
+          <button id="adminToggle">Admin: OFF</button>
+          <button id="adminFly">Fly: OFF</button>
+          <button id="adminScore">+5 Score</button>
+          <button id="adminTime">+15s</button>
+          <button id="adminWin">Win Round</button>
+        </div>
+      </section>
+
+      <section class="mobile-controls" aria-label="Touch controls">
+        <p class="mobile-hint"><strong>Phone Control:</strong> Drag this wheel to move</p>
+        <div id="moveWheel" class="move-wheel">
+          <div id="moveThumb" class="move-thumb"></div>
+        </div>
+      </section>
+
+      <section class="season-box">
+        <p id="roundSummary" class="season-line">Finish a round to start elimination.</p>
+        <p id="rosterLine" class="season-line">Remaining: Leafy Classic, Teardrop, Lava Lamp, Lollipop, Red Blocky, plus others</p>
+        <p id="eliminationLine" class="season-line">Eliminated: none</p>
+      </section>
+
+      <p id="message" class="message">Round starts now. Good luck!</p>
+    </main>
+
+    <script src="vendor/three.min.js?v=2"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="game.js?v=14"></script>
+  </body>
+</html>

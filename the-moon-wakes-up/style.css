@@ -1,0 +1,141 @@
+:root {
+  --bg-0: #05060d;
+  --bg-1: #0d1230;
+  --ink: #ecf3ff;
+  --hud: rgba(15, 20, 46, 0.72);
+  --accent: #88c3ff;
+  --danger: #ff6f93;
+  --ok: #74ffbc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% 0%, #202a68 0%, var(--bg-1) 42%, var(--bg-0) 100%);
+  color: var(--ink);
+  font-family: "Trebuchet MS", "Avenir Next", sans-serif;
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.game-wrap {
+  width: min(980px, 100vw);
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 14px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.3rem, 4.5vw, 2rem);
+  letter-spacing: 0.6px;
+}
+
+button {
+  border: 1px solid #8cbcff;
+  background: linear-gradient(180deg, #3f6df0 0%, #2848a5 100%);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.hud {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hud p {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--hud);
+  border: 1px solid #3a4f95;
+}
+
+#game {
+  margin-top: 12px;
+  width: 100%;
+  height: min(62vh, 560px);
+  border-radius: 16px;
+  border: 2px solid #4867c8;
+  background: #060a1d;
+  display: block;
+}
+
+.message {
+  margin: 10px 0 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--hud);
+  border: 1px solid #2f4d95;
+}
+
+.message.win {
+  border-color: #58d89f;
+  color: var(--ok);
+}
+
+.message.lose {
+  border-color: #ff6f93;
+  color: #ffd0dc;
+}
+
+.controls {
+  margin-top: 10px;
+  color: #d8e7ff;
+}
+
+.controls p {
+  margin: 0;
+}
+
+.touch-ui {
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+.stick-base {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  border: 2px solid #4f72d8;
+  background: radial-gradient(circle at 30% 30%, #243b8f 0%, #15265e 72%, #0d173f 100%);
+  position: relative;
+  touch-action: none;
+}
+
+.stick-thumb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #84b7ff 0%, #4f8ceb 100%);
+  transform: translate(-50%, -50%);
+  border: 2px solid #d9ecff;
+  pointer-events: none;
+}
+
+@media (min-width: 900px) {
+  .touch-ui {
+    justify-content: flex-start;
+  }
+}

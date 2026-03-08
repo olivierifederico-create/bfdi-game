@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>The Moon Wakes Up</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="game-wrap">
+      <header class="topbar">
+        <h1>The Moon Wakes Up</h1>
+        <button id="restartBtn" type="button">Restart</button>
+      </header>
+
+      <section class="hud" aria-label="Game status">
+        <p>Dream Sparks: <strong id="score">0</strong>/<span id="target">12</span></p>
+        <p>Night Time: <strong id="time">60</strong>s</p>
+      </section>
+
+      <canvas id="game" aria-label="The Moon Wakes Up game area"></canvas>
+      <p id="message" class="message">Collect sparks before night fades. Avoid shadows.</p>
+
+      <section class="controls" aria-label="Controls">
+        <p><strong>Move:</strong> WASD / Arrow keys / drag the moon pad</p>
+      </section>
+
+      <section class="touch-ui" aria-label="Touch controls">
+        <div id="stickBase" class="stick-base">
+          <div id="stickThumb" class="stick-thumb"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="game.js"></script>
+  </body>
+</html>
