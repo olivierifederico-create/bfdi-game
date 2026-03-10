@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Object Show Party</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Baloo+2:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hud">
+      <h1>Object Show Party</h1>
+      <div class="stats">
+        <div class="chip">Score: <span id="score">0</span></div>
+        <div class="chip">Time: <span id="time">90</span>s</div>
+        <div class="chip">Hearts: <span id="hearts">3</span></div>
+      </div>
+    </header>
+
+    <section class="character-picker" aria-label="Character picker">
+      <p>Pick your object:</p>
+      <div id="characterButtons" class="character-buttons"></div>
+    </section>
+
+    <section class="arena-wrap">
+      <canvas id="arena" width="960" height="540" aria-label="Game arena"></canvas>
+      <div class="game-overlay" id="message">Tap Start to play</div>
+    </section>
+
+    <section class="actions">
+      <button id="startBtn" class="big-btn">Start Game</button>
+      <button id="resetBtn" class="big-btn secondary">Reset</button>
+    </section>
+
+    <section class="controls" aria-label="Touch controls">
+      <button id="leftBtn" class="ctrl">Left</button>
+      <button id="jumpBtn" class="ctrl jump">Jump / Fly</button>
+      <button id="rightBtn" class="ctrl">Right</button>
+    </section>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
