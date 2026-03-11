@@ -18,6 +18,7 @@ const leftBtn = document.getElementById("leftBtn");
 const rightBtn = document.getElementById("rightBtn");
 const jumpBtn = document.getElementById("jumpBtn");
 const characterButtons = document.getElementById("characterButtons");
+const creatorForm = document.getElementById("creatorForm");
 const customNameInput = document.getElementById("customName");
 const customShapeSelect = document.getElementById("customShape");
 const customMainInput = document.getElementById("customMain");
@@ -373,37 +374,42 @@ function refreshCharacterButtons() {
 }
 
 function addCustomCharacter() {
-  if (characterPool.length >= 60) {
-    updateCreatorStatus("Character limit reached. Press Reset to clear gameplay and keep characters.");
-    return;
+  try {
+    if (characterPool.length >= 60) {
+      updateCreatorStatus("Character limit reached. Press Reset to continue.");
+      return;
+    }
+
+    const typed = customNameInput ? customNameInput.value.trim().slice(0, 20) : "";
+    const label = typed || `My Character ${getCustomCharacters().length + 1}`;
+
+    const character = {
+      id: makeCharacterId(label),
+      label,
+      kind: customShapeSelect ? customShapeSelect.value : "ball",
+      main: customMainInput ? customMainInput.value : "#ffd66e",
+      accent: customAccentInput ? customAccentInput.value : "#5ac8ff",
+      custom: true
+    };
+
+    characterPool.push(character);
+    saveCustomCharacters();
+    refreshCharacterButtons();
+    setPlayerCharacter(character);
+    updateCreatorStatus(`Added ${label}.`);
+    updateRecordStatus(`Character ${label} added.`);
+    if (customNameInput) customNameInput.value = "";
+  } catch (err) {
+    updateCreatorStatus("Could not add character. Try again.");
   }
-
-  const typed = customNameInput ? customNameInput.value.trim().slice(0, 20) : "";
-  const label = typed || `My Character ${getCustomCharacters().length + 1}`;
-
-  const character = {
-    id: makeCharacterId(label),
-    label,
-    kind: customShapeSelect ? customShapeSelect.value : "ball",
-    main: customMainInput ? customMainInput.value : "#ffd66e",
-    accent: customAccentInput ? customAccentInput.value : "#5ac8ff",
-    custom: true
-  };
-
-  characterPool.push(character);
-  saveCustomCharacters();
-  refreshCharacterButtons();
-  setPlayerCharacter(character);
-  updateCreatorStatus(`Added ${label}.`);
-  updateRecordStatus(`Character ${label} added.`);
-  if (customNameInput) customNameInput.value = "";
 }
 
 function handleAddCharacterPress(e) {
-  if (e) e.preventDefault();
+  if (e && typeof e.preventDefault === "function") e.preventDefault();
   const now = Date.now();
   if (now - lastAddPressAt < 220) return;
   lastAddPressAt = now;
+  updateCreatorStatus("Adding character...");
   addCustomCharacter();
 }
 
@@ -831,17 +837,10 @@ window.addEventListener("keyup", ev => {
 
 if (addCharacterBtn) {
   addCharacterBtn.addEventListener("click", handleAddCharacterPress);
-  addCharacterBtn.addEventListener("pointerup", handleAddCharacterPress);
-  addCharacterBtn.addEventListener("touchend", handleAddCharacterPress, { passive: false });
 }
 
-if (customNameInput) {
-  customNameInput.addEventListener("keydown", ev => {
-    if (ev.key === "Enter") {
-      ev.preventDefault();
-      addCustomCharacter();
-    }
-  });
+if (creatorForm) {
+  creatorForm.addEventListener("submit", handleAddCharacterPress);
 }
 
 if (recordBtn) {

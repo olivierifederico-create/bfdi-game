@@ -29,7 +29,7 @@
 
     <section class="creator" aria-label="Create your character">
       <p>Create your own character:</p>
-      <div class="creator-grid">
+      <form id="creatorForm" class="creator-grid">
         <input id="customName" type="text" maxlength="20" placeholder="Name (ex: StarKid)" />
         <select id="customShape">
           <option value="tube">Tube</option>
@@ -41,8 +41,8 @@
         </select>
         <label class="color-wrap">Main <input id="customMain" type="color" value="#ffd66e" /></label>
         <label class="color-wrap">Accent <input id="customAccent" type="color" value="#5ac8ff" /></label>
-        <button id="addCharacterBtn" class="big-btn creator-btn">Add Character</button>
-      </div>
+        <button id="addCharacterBtn" type="submit" class="big-btn creator-btn">Add Character</button>
+      </form>
       <p id="creatorStatus" class="creator-status">Tip: add a name, pick shape/colors, then tap Add Character.</p>
     </section>
 
@@ -68,6 +68,6 @@
   </main>
 
   <script src="../vendor/three.min.js"></script>
-  <script src="game.js"></script>
+  <script src="game.js?v=20260311b"></script>
 </body>
 </html>
