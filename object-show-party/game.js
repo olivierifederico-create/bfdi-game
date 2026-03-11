@@ -3,6 +3,7 @@ const canvas = document.getElementById("arena");
 const scoreEl = document.getElementById("score");
 const timeEl = document.getElementById("time");
 const heartsEl = document.getElementById("hearts");
+const currentCharEl = document.getElementById("currentChar");
 const hostNameEl = document.getElementById("hostName");
 const challengeNameEl = document.getElementById("challengeName");
 const hostLineEl = document.getElementById("hostLine");
@@ -358,6 +359,7 @@ function refreshCharacterButtons() {
     btn.className = "char-btn";
     btn.type = "button";
     btn.textContent = character.label;
+    btn.dataset.charId = character.id;
     if (character.id === state.selected.id) btn.classList.add("active");
 
     btn.addEventListener("click", () => {
@@ -366,6 +368,7 @@ function refreshCharacterButtons() {
       [...characterButtons.querySelectorAll(".char-btn")].forEach(node => node.classList.remove("active"));
       btn.classList.add("active");
       updateCreatorStatus(`Selected ${character.label}.`);
+      updateHUD();
     });
 
     characterButtons.appendChild(btn);
@@ -401,11 +404,22 @@ function addCustomCharacter() {
     if (customNameInput) customNameInput.value = "";
 
     if (characterButtons) {
-      const addedBtn = characterButtons.querySelector(".char-btn");
-      if (addedBtn && typeof addedBtn.scrollIntoView === "function") {
-        addedBtn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      const addedBtn = characterButtons.querySelector(`[data-char-id=\"${character.id}\"]`);
+      if (addedBtn) {
+        [...characterButtons.querySelectorAll(".char-btn")].forEach(node => node.classList.remove("active"));
+        addedBtn.classList.add("active");
+        try {
+          if (typeof addedBtn.scrollIntoView === "function") {
+            addedBtn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+          }
+        } catch (_err) {
+          // Older iOS Safari can reject options object.
+          if (typeof addedBtn.scrollIntoView === "function") addedBtn.scrollIntoView();
+        }
       }
     }
+
+    updateHUD();
   } catch (err) {
     updateCreatorStatus(`Could not add character. Try again. ${err && err.message ? err.message : ""}`.trim());
   }
@@ -424,6 +438,7 @@ function updateHUD() {
   setElText(scoreEl, String(state.score));
   setElText(timeEl, String(Math.max(0, Math.ceil(state.timeLeft))));
   setElText(heartsEl, String(state.hearts));
+  setElText(currentCharEl, state.selected.label);
   setElText(hostNameEl, state.host.name);
   setElText(challengeNameEl, challenge.title);
 
