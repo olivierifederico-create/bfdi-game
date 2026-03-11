@@ -25,6 +25,24 @@
       <div id="characterButtons" class="character-buttons"></div>
     </section>
 
+    <section class="creator" aria-label="Create your character">
+      <p>Create your own character:</p>
+      <div class="creator-grid">
+        <input id="customName" type="text" maxlength="20" placeholder="Name (ex: StarKid)" />
+        <select id="customShape">
+          <option value="tube">Tube</option>
+          <option value="tree">Tree</option>
+          <option value="frame">Frame</option>
+          <option value="ring">Ring</option>
+          <option value="book">Book</option>
+          <option value="ball">Ball</option>
+        </select>
+        <label class="color-wrap">Main <input id="customMain" type="color" value="#ffd66e" /></label>
+        <label class="color-wrap">Accent <input id="customAccent" type="color" value="#5ac8ff" /></label>
+        <button id="addCharacterBtn" class="big-btn creator-btn">Add Character</button>
+      </div>
+    </section>
+
     <section class="arena-wrap">
       <canvas id="arena" width="960" height="540" aria-label="Game arena"></canvas>
       <div class="game-overlay" id="message">Tap Start to play</div>
@@ -33,7 +51,9 @@
     <section class="actions">
       <button id="startBtn" class="big-btn">Start Game</button>
       <button id="resetBtn" class="big-btn secondary">Reset</button>
+      <button id="recordBtn" class="big-btn record">Record Video</button>
     </section>
+    <p id="recordStatus" class="record-status">Record your gameplay and share it with your son.</p>
 
     <section class="controls" aria-label="Touch controls">
       <button id="leftBtn" class="ctrl">Left</button>

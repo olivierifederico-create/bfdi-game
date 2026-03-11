@@ -8,14 +8,21 @@ const timeEl = document.getElementById("time");
 const heartsEl = document.getElementById("hearts");
 const startBtn = document.getElementById("startBtn");
 const resetBtn = document.getElementById("resetBtn");
+const recordBtn = document.getElementById("recordBtn");
+const recordStatus = document.getElementById("recordStatus");
 const messageEl = document.getElementById("message");
 
 const leftBtn = document.getElementById("leftBtn");
 const rightBtn = document.getElementById("rightBtn");
 const jumpBtn = document.getElementById("jumpBtn");
 const characterButtons = document.getElementById("characterButtons");
+const customNameInput = document.getElementById("customName");
+const customShapeSelect = document.getElementById("customShape");
+const customMainInput = document.getElementById("customMain");
+const customAccentInput = document.getElementById("customAccent");
+const addCharacterBtn = document.getElementById("addCharacterBtn");
 
-const CHARACTER_SET = [
+const DEFAULT_CHARACTERS = [
   { id: "gluey", label: "Gluey", main: "#f7f9ff", accent: "#43c6f2", kind: "tube" },
   { id: "piney", label: "Piney", main: "#30c151", accent: "#1c913a", kind: "tree" },
   { id: "photoy", label: "Photoy", main: "#f36186", accent: "#4d74d8", kind: "frame" },
@@ -23,6 +30,9 @@ const CHARACTER_SET = [
   { id: "booksy", label: "Booksy", main: "#31b9d3", accent: "#3ec243", kind: "book" },
   { id: "ballsy", label: "Ballsy", main: "#f4d65c", accent: "#6bd1f8", kind: "ball" }
 ];
+let characterPool = [...DEFAULT_CHARACTERS];
+
+const CUSTOM_STORAGE_KEY = "object-show-party-custom-characters-v1";
 
 const state = {
   running: false,
@@ -30,7 +40,7 @@ const state = {
   score: 0,
   hearts: 3,
   timeLeft: 90,
-  selected: CHARACTER_SET[0],
+  selected: characterPool[0],
   elapsedSpawn: 0,
   pickups: [],
   stars: [],
@@ -60,6 +70,9 @@ const controls = {
 };
 
 let lastTs = 0;
+let mediaRecorder = null;
+let recording = false;
+let recordedChunks = [];
 
 function groundY() {
   return viewH - 78;
@@ -119,6 +132,50 @@ function setMessage(text) {
     messageEl.classList.remove("hide");
   } else {
     messageEl.classList.add("hide");
+  }
+}
+
+function updateRecordStatus(text) {
+  recordStatus.textContent = text;
+}
+
+function makeCharacterId(name) {
+  return `custom-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
+}
+
+function getCustomCharacters() {
+  return characterPool.filter(c => c.custom);
+}
+
+function saveCustomCharacters() {
+  try {
+    localStorage.setItem(CUSTOM_STORAGE_KEY, JSON.stringify(getCustomCharacters()));
+  } catch (err) {
+    updateRecordStatus("Character saved for now, but browser storage is blocked.");
+  }
+}
+
+function loadCustomCharacters() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return;
+    const loaded = parsed
+      .filter(item => item && item.label && item.kind && item.main && item.accent)
+      .slice(0, 24)
+      .map(item => ({
+        id: item.id || makeCharacterId(item.label),
+        label: String(item.label).slice(0, 20),
+        main: String(item.main),
+        accent: String(item.accent),
+        kind: String(item.kind),
+        custom: true
+      }));
+    characterPool = [...DEFAULT_CHARACTERS, ...loaded];
+    state.selected = characterPool[0];
+  } catch (_err) {
+    characterPool = [...DEFAULT_CHARACTERS];
   }
 }
 
@@ -475,7 +532,8 @@ function bindHoldButton(btn, key) {
 }
 
 function makeCharacterButtons() {
-  CHARACTER_SET.forEach(character => {
+  characterButtons.innerHTML = "";
+  characterPool.forEach(character => {
     const btn = document.createElement("button");
     btn.className = "char-btn";
     btn.textContent = character.label;
@@ -492,6 +550,126 @@ function makeCharacterButtons() {
 
     characterButtons.appendChild(btn);
   });
+}
+
+function addCustomCharacter() {
+  if (characterPool.length >= 30) {
+    updateRecordStatus("Character limit reached. Refresh to clear and add more.");
+    return;
+  }
+
+  const label = customNameInput.value.trim().slice(0, 20);
+  if (!label) {
+    updateRecordStatus("Type a character name first.");
+    return;
+  }
+
+  const character = {
+    id: makeCharacterId(label),
+    label,
+    kind: customShapeSelect.value,
+    main: customMainInput.value,
+    accent: customAccentInput.value,
+    custom: true
+  };
+
+  characterPool.push(character);
+  state.selected = character;
+  saveCustomCharacters();
+  makeCharacterButtons();
+  updateRecordStatus(`Character "${label}" added.`);
+  customNameInput.value = "";
+}
+
+function recordingMimeType() {
+  const types = [
+    "video/mp4;codecs=h264",
+    "video/mp4",
+    "video/webm;codecs=vp9",
+    "video/webm"
+  ];
+  for (const type of types) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+  return "";
+}
+
+function setRecordingUi(isRecording) {
+  recording = isRecording;
+  recordBtn.classList.toggle("active", isRecording);
+  recordBtn.textContent = isRecording ? "Stop Recording" : "Record Video";
+}
+
+async function finalizeRecording(blob, filename) {
+  const file = new File([blob], filename, { type: blob.type || "video/mp4" });
+
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        title: "My Object Show Video",
+        text: "I made this game video!",
+        files: [file]
+      });
+      updateRecordStatus("Shared. You can also save it to Photos from the share sheet.");
+      return;
+    } catch (_err) {
+      // User canceled share; continue to download fallback.
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1600);
+  updateRecordStatus("Video downloaded. On iPhone: open Files, then Save Video to Photos.");
+}
+
+function startRecording() {
+  if (!canvas.captureStream || !window.MediaRecorder) {
+    updateRecordStatus("Recording not supported in this browser.");
+    return;
+  }
+  if (recording) return;
+
+  try {
+    const stream = canvas.captureStream(30);
+    const mimeType = recordingMimeType();
+    mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    recordedChunks = [];
+
+    mediaRecorder.ondataavailable = e => {
+      if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach(track => track.stop());
+      const outputType = mediaRecorder.mimeType || "video/mp4";
+      const ext = outputType.includes("mp4") ? "mp4" : "webm";
+      const blob = new Blob(recordedChunks, { type: outputType });
+      const filename = `object-show-video-${Date.now()}.${ext}`;
+      setRecordingUi(false);
+      finalizeRecording(blob, filename);
+    };
+
+    mediaRecorder.start(120);
+    setRecordingUi(true);
+    updateRecordStatus("Recording... tap Stop Recording when done.");
+  } catch (_err) {
+    setRecordingUi(false);
+    updateRecordStatus("Could not start recording. Try Safari on iPhone.");
+  }
+}
+
+function stopRecording() {
+  if (!recording || !mediaRecorder) return;
+  if (mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+    updateRecordStatus("Processing video...");
+  }
 }
 
 function resizeCanvas() {
@@ -541,9 +719,29 @@ bindHoldButton(jumpBtn, "jump");
 
 startBtn.addEventListener("click", startGame);
 resetBtn.addEventListener("click", resetGame);
+addCharacterBtn.addEventListener("click", addCustomCharacter);
+customNameInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    addCustomCharacter();
+  }
+});
+recordBtn.addEventListener("click", () => {
+  if (recording) {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+});
 
 window.addEventListener("resize", resizeCanvas);
+window.addEventListener("beforeunload", () => {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  }
+});
 
+loadCustomCharacters();
 makeCharacterButtons();
 resetGame();
 resizeCanvas();

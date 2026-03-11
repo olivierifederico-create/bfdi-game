@@ -73,7 +73,8 @@ body {
   gap: 7px;
 }
 
-.character-picker p {
+.character-picker p,
+.creator p {
   margin: 0;
   font-weight: 600;
 }
@@ -97,6 +98,56 @@ body {
 .char-btn.active {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px #ffcf86;
+}
+
+.creator {
+  margin-top: 9px;
+  display: grid;
+  gap: 8px;
+}
+
+.creator-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.creator-grid input[type="text"],
+.creator-grid select {
+  width: 100%;
+  border: 2px solid #c8e6f4;
+  border-radius: 10px;
+  background: #fff;
+  min-height: 42px;
+  font: 600 0.96rem "Fredoka", sans-serif;
+  color: var(--ink);
+  padding: 6px 10px;
+}
+
+.color-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 2px solid #c8e6f4;
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px 9px;
+  min-height: 42px;
+  font-weight: 600;
+}
+
+.color-wrap input[type="color"] {
+  border: 0;
+  width: 42px;
+  height: 30px;
+  background: transparent;
+  padding: 0;
+}
+
+.creator-btn {
+  grid-column: span 2;
+  background: #006dc6;
 }
 
 .arena-wrap {
@@ -154,6 +205,21 @@ body {
   background: var(--accent-2);
 }
 
+.big-btn.record {
+  background: #e63b5f;
+}
+
+.big-btn.record.active {
+  background: #a30628;
+}
+
+.record-status {
+  margin: 8px 2px 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #243f65;
+}
+
 .controls {
   margin-top: 10px;
   display: grid;
@@ -180,5 +246,20 @@ body {
 @media (min-width: 760px) {
   .controls {
     max-width: 520px;
+  }
+}
+
+@media (max-width: 640px) {
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .creator-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .creator-btn {
+    grid-column: span 1;
   }
 }
