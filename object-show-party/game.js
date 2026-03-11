@@ -1,7 +1,4 @@
 const canvas = document.getElementById("arena");
-const ctx = canvas.getContext("2d");
-let viewW = 960;
-let viewH = 540;
 
 const scoreEl = document.getElementById("score");
 const timeEl = document.getElementById("time");
@@ -10,10 +7,11 @@ const hostNameEl = document.getElementById("hostName");
 const challengeNameEl = document.getElementById("challengeName");
 const hostLineEl = document.getElementById("hostLine");
 const challengeInfoEl = document.getElementById("challengeInfo");
+const creatorStatusEl = document.getElementById("creatorStatus");
 const startBtn = document.getElementById("startBtn");
 const resetBtn = document.getElementById("resetBtn");
 const recordBtn = document.getElementById("recordBtn");
-const recordStatus = document.getElementById("recordStatus");
+const recordStatusEl = document.getElementById("recordStatus");
 const messageEl = document.getElementById("message");
 
 const leftBtn = document.getElementById("leftBtn");
@@ -26,6 +24,8 @@ const customMainInput = document.getElementById("customMain");
 const customAccentInput = document.getElementById("customAccent");
 const addCharacterBtn = document.getElementById("addCharacterBtn");
 
+const CUSTOM_STORAGE_KEY = "object-show-party-custom-characters-v2";
+
 const DEFAULT_CHARACTERS = [
   { id: "gluey", label: "Gluey", main: "#f7f9ff", accent: "#43c6f2", kind: "tube" },
   { id: "piney", label: "Piney", main: "#30c151", accent: "#1c913a", kind: "tree" },
@@ -34,93 +34,65 @@ const DEFAULT_CHARACTERS = [
   { id: "booksy", label: "Booksy", main: "#31b9d3", accent: "#3ec243", kind: "book" },
   { id: "ballsy", label: "Ballsy", main: "#f4d65c", accent: "#6bd1f8", kind: "ball" }
 ];
-let characterPool = [...DEFAULT_CHARACTERS];
-
-const CUSTOM_STORAGE_KEY = "object-show-party-custom-characters-v1";
 
 const HOSTS = [
-  {
-    name: "Cloud Host",
-    line: "Welcome players. Finish all challenges to win the show!",
-    kind: "frame",
-    main: "#f3fdff",
-    accent: "#77c8ff"
-  },
-  {
-    name: "Star Host",
-    line: "Fast hands win this one. Let the challenge begin!",
-    kind: "ball",
-    main: "#ffd365",
-    accent: "#ff8f62"
-  },
-  {
-    name: "Neon Host",
-    line: "Three rounds, one winner. Keep moving!",
-    kind: "tube",
-    main: "#f7f6ff",
-    accent: "#45e29f"
-  }
+  { name: "Cloud Host", line: "Welcome to the infinite world challenge!", kind: "frame", main: "#f3fdff", accent: "#77c8ff" },
+  { name: "Star Host", line: "Beat all rounds and become the winner!", kind: "ball", main: "#ffd365", accent: "#ff8f62" },
+  { name: "Neon Host", line: "Move fast. Dodge danger. Collect stars!", kind: "tube", main: "#f7f6ff", accent: "#45e29f" }
 ];
 
 const CHALLENGES = [
   {
     key: "collect",
     title: "Collect 8 stars",
-    detail: "Challenge 1: Collect 8 stars before time runs out.",
-    duration: 25,
+    detail: "Challenge 1: Collect 8 stars.",
+    duration: 28,
     goal: 8,
-    spawnInterval: 0.62,
-    badRate: 0.18
+    spawnInterval: 0.65,
+    badRate: 0.2
   },
   {
     key: "survive",
-    title: "Survive the hazard round",
-    detail: "Challenge 2: Survive while dodging the red danger balls.",
-    duration: 20,
+    title: "Survive hazard round",
+    detail: "Challenge 2: Survive the danger balls.",
+    duration: 22,
     goal: 0,
     spawnInterval: 0.48,
-    badRate: 0.52
+    badRate: 0.58
   },
   {
     key: "final",
     title: "Reach score 18",
-    detail: "Final Challenge: Reach total score 18 to win the episode.",
+    detail: "Final Challenge: Reach score 18.",
     duration: 35,
     goal: 18,
-    spawnInterval: 0.55,
-    badRate: 0.25
+    spawnInterval: 0.56,
+    badRate: 0.28
   }
 ];
+
+let characterPool = [...DEFAULT_CHARACTERS];
+let playerMesh = null;
+let hostMesh = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let recording = false;
+let pulseTimer = null;
+let lastAddPressAt = 0;
 
 const state = {
   running: false,
   over: false,
   score: 0,
   hearts: 3,
-  timeLeft: CHALLENGES[0].duration,
-  selected: characterPool[0],
   host: HOSTS[0],
+  selected: characterPool[0],
   challengeIndex: 0,
   challengeProgress: 0,
-  elapsedSpawn: 0,
-  pickups: [],
-  stars: [],
-  shake: 0
-};
-
-const player = {
-  x: 110,
-  y: 0,
-  w: 66,
-  h: 76,
-  vx: 0,
-  vy: 0,
-  moveSpeed: 340,
-  jumpPower: 660,
-  gravity: 1650,
-  onGround: false,
-  flyFuel: 95,
-  maxFlyFuel: 95
+  timeLeft: CHALLENGES[0].duration,
+  spawnAccumulator: 0,
+  worldSpeed: 11,
+  pickups: []
 };
 
 const controls = {
@@ -130,95 +102,112 @@ const controls = {
   jumpQueued: false
 };
 
-let lastTs = 0;
-let mediaRecorder = null;
-let recording = false;
-let recordedChunks = [];
-let pulseTimer = null;
+const player = {
+  x: 0,
+  y: 1,
+  vx: 0,
+  vy: 0,
+  moveSpeed: 8,
+  gravity: -23,
+  jumpPower: 9,
+  onGround: true,
+  flyFuel: 2.4,
+  maxFlyFuel: 2.4
+};
 
-function groundY() {
-  return viewH - 78;
-}
+const world = {
+  laneMin: -4,
+  laneMax: 4,
+  floorY: 0,
+  playerZ: 0,
+  segmentLength: 18,
+  segments: [],
+  segmentCount: 10
+};
 
-function resetGame() {
-  if (pulseTimer) {
-    clearTimeout(pulseTimer);
-    pulseTimer = null;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(canvas.clientWidth || 960, canvas.clientHeight || 540, false);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#89ddff");
+scene.fog = new THREE.Fog("#9ce8ff", 16, 90);
+
+const camera = new THREE.PerspectiveCamera(58, 16 / 9, 0.1, 220);
+camera.position.set(0, 5.4, 11.2);
+camera.lookAt(0, 1.5, 0);
+
+const hemi = new THREE.HemisphereLight("#d7fbff", "#6ab985", 0.95);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight("#fff5d6", 0.95);
+sun.position.set(6, 14, 8);
+scene.add(sun);
+
+const roadGroup = new THREE.Group();
+scene.add(roadGroup);
+
+const skyStars = new THREE.Group();
+scene.add(skyStars);
+
+function makeSkyStars() {
+  skyStars.clear();
+  const starGeo = new THREE.SphereGeometry(0.07, 8, 8);
+  const starMat = new THREE.MeshBasicMaterial({ color: "#ffffff" });
+  for (let i = 0; i < 90; i += 1) {
+    const s = new THREE.Mesh(starGeo, starMat);
+    s.position.set((Math.random() - 0.5) * 36, Math.random() * 8 + 3, -Math.random() * 92 - 4);
+    skyStars.add(s);
   }
-  state.running = false;
-  state.over = false;
-  state.score = 0;
-  state.hearts = 3;
-  state.timeLeft = CHALLENGES[0].duration;
-  state.challengeIndex = 0;
-  state.challengeProgress = 0;
-  state.elapsedSpawn = 0;
-  state.pickups = [];
-  state.stars = makeStars();
-  state.shake = 0;
-  chooseHost();
-
-  player.x = 110;
-  player.y = groundY() - player.h;
-  player.vx = 0;
-  player.vy = 0;
-  player.onGround = true;
-  player.flyFuel = player.maxFlyFuel;
-
-  controls.left = false;
-  controls.right = false;
-  controls.jump = false;
-  controls.jumpQueued = false;
-
-  challengeInfoEl.textContent = CHALLENGES[0].detail;
-  setHostLine(`${state.host.line} Pick your character and tap Start.`);
-  setMessage("Tap Start to play");
-  renderHUD();
 }
 
-function startGame() {
-  if (state.running) return;
-  if (state.over) {
-    resetGame();
+function makeRoadSegments() {
+  world.segments = [];
+  roadGroup.clear();
+
+  const roadGeo = new THREE.BoxGeometry(12.5, 0.25, world.segmentLength);
+  const sideGeo = new THREE.BoxGeometry(2.3, 0.15, world.segmentLength);
+
+  for (let i = 0; i < world.segmentCount; i += 1) {
+    const z = -i * world.segmentLength;
+
+    const road = new THREE.Mesh(
+      roadGeo,
+      new THREE.MeshStandardMaterial({ color: i % 2 ? "#2f965f" : "#2a8754", roughness: 0.95 })
+    );
+    road.position.set(0, -0.12, z);
+
+    const leftGrass = new THREE.Mesh(
+      sideGeo,
+      new THREE.MeshStandardMaterial({ color: "#4ec06f", roughness: 1 })
+    );
+    leftGrass.position.set(-7.2, -0.05, z);
+
+    const rightGrass = leftGrass.clone();
+    rightGrass.position.x = 7.2;
+
+    roadGroup.add(road, leftGrass, rightGrass);
+    world.segments.push({ road, leftGrass, rightGrass });
   }
-  state.running = true;
-  startChallenge(state.challengeIndex);
 }
 
-function endGame(text) {
-  state.running = false;
-  state.over = true;
-  setMessage(text);
-}
-
-function renderHUD() {
-  const challenge = currentChallenge();
-  scoreEl.textContent = String(state.score);
-  timeEl.textContent = String(Math.max(0, Math.ceil(state.timeLeft)));
-  heartsEl.textContent = String(state.hearts);
-  hostNameEl.textContent = state.host.name;
-  challengeNameEl.textContent = challenge.title;
-
-  if (challenge.key === "collect") {
-    challengeInfoEl.textContent = `Challenge ${state.challengeIndex + 1}: Collect ${state.challengeProgress}/${challenge.goal} stars.`;
-  } else if (challenge.key === "survive") {
-    challengeInfoEl.textContent = `Challenge ${state.challengeIndex + 1}: Survive. Time left ${Math.max(0, Math.ceil(state.timeLeft))}s.`;
-  } else {
-    challengeInfoEl.textContent = `Final Challenge: Reach score ${challenge.goal}. Current score ${state.score}.`;
-  }
+function setElText(el, text) {
+  if (el) el.textContent = text;
 }
 
 function setMessage(text) {
+  if (!messageEl) return;
   messageEl.textContent = text;
-  if (text) {
-    messageEl.classList.remove("hide");
-  } else {
-    messageEl.classList.add("hide");
-  }
+  if (text) messageEl.classList.remove("hide");
+  else messageEl.classList.add("hide");
+}
+
+function updateCreatorStatus(text) {
+  setElText(creatorStatusEl, text);
 }
 
 function updateRecordStatus(text) {
-  recordStatus.textContent = text;
+  setElText(recordStatusEl, text);
 }
 
 function currentChallenge() {
@@ -230,38 +219,7 @@ function chooseHost() {
 }
 
 function setHostLine(text) {
-  hostLineEl.textContent = `Host says: ${text}`;
-}
-
-function showPulse(text, ms = 1300) {
-  setMessage(text);
-  if (pulseTimer) {
-    clearTimeout(pulseTimer);
-  }
-  pulseTimer = setTimeout(() => {
-    if (state.running) setMessage("");
-    pulseTimer = null;
-  }, ms);
-}
-
-function startChallenge(index) {
-  state.challengeIndex = index;
-  state.challengeProgress = 0;
-  state.timeLeft = CHALLENGES[index].duration;
-  state.elapsedSpawn = 0;
-  state.pickups = [];
-  challengeInfoEl.textContent = CHALLENGES[index].detail;
-  setHostLine(`${state.host.line} Now: ${CHALLENGES[index].title}.`);
-  renderHUD();
-  showPulse(`Round ${index + 1}: ${CHALLENGES[index].title}`);
-}
-
-function advanceChallenge() {
-  if (state.challengeIndex >= CHALLENGES.length - 1) {
-    endGame(`You won all challenges! Final score: ${state.score}`);
-    return;
-  }
-  startChallenge(state.challengeIndex + 1);
+  setElText(hostLineEl, `Host says: ${text}`);
 }
 
 function makeCharacterId(name) {
@@ -275,8 +233,8 @@ function getCustomCharacters() {
 function saveCustomCharacters() {
   try {
     localStorage.setItem(CUSTOM_STORAGE_KEY, JSON.stringify(getCustomCharacters()));
-  } catch (err) {
-    updateRecordStatus("Character saved for now, but browser storage is blocked.");
+  } catch (_err) {
+    updateCreatorStatus("Saved for now, but browser storage is blocked.");
   }
 }
 
@@ -288,48 +246,379 @@ function loadCustomCharacters() {
     if (!Array.isArray(parsed)) return;
     const loaded = parsed
       .filter(item => item && item.label && item.kind && item.main && item.accent)
-      .slice(0, 24)
+      .slice(0, 40)
       .map(item => ({
-        id: item.id || makeCharacterId(item.label),
+        id: item.id || makeCharacterId(String(item.label)),
         label: String(item.label).slice(0, 20),
+        kind: String(item.kind),
         main: String(item.main),
         accent: String(item.accent),
-        kind: String(item.kind),
         custom: true
       }));
+
     characterPool = [...DEFAULT_CHARACTERS, ...loaded];
     state.selected = characterPool[0];
   } catch (_err) {
     characterPool = [...DEFAULT_CHARACTERS];
+    state.selected = characterPool[0];
   }
 }
 
-function makeStars() {
-  const stars = [];
-  for (let i = 0; i < 50; i += 1) {
-    stars.push({
-      x: Math.random() * viewW,
-      y: Math.random() * viewH * 0.55,
-      s: Math.random() * 2.2 + 1,
-      drift: (Math.random() - 0.5) * 0.24
-    });
+function makeCharacterMesh(character, scale = 1) {
+  const group = new THREE.Group();
+  const main = new THREE.Color(character.main);
+  const accent = new THREE.Color(character.accent);
+  const dark = new THREE.Color("#111111");
+
+  const bodyMat = new THREE.MeshStandardMaterial({ color: main, roughness: 0.62, metalness: 0.1 });
+  const accentMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.5, metalness: 0.15 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: dark, roughness: 0.9 });
+
+  if (character.kind === "tube") {
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.05, 2.2, 24), bodyMat);
+    body.position.y = 1.4;
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.5, 0.5, 18), accentMat);
+    cap.position.y = 2.7;
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.15, 0.35, 24), accentMat);
+    base.position.y = 0.28;
+    group.add(body, cap, base);
+  } else if (character.kind === "tree") {
+    const coneA = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.7, 22), bodyMat);
+    coneA.position.y = 2.2;
+    const coneB = new THREE.Mesh(new THREE.ConeGeometry(1.35, 1.85, 22), accentMat);
+    coneB.position.y = 1.45;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 1, 12), new THREE.MeshStandardMaterial({ color: "#97b55d" }));
+    trunk.position.y = 0.35;
+    group.add(coneA, coneB, trunk);
+  } else if (character.kind === "frame") {
+    const out = new THREE.Mesh(new THREE.BoxGeometry(2.15, 2.15, 0.3), new THREE.MeshStandardMaterial({ color: "#ffffff" }));
+    out.position.y = 1.4;
+    const inA = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.75, 0.15), accentMat);
+    inA.position.set(0, 1.72, 0.24);
+    const inB = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.75, 0.15), bodyMat);
+    inB.position.set(0, 1.1, 0.24);
+    group.add(out, inA, inB);
+  } else if (character.kind === "ring") {
+    const tor = new THREE.Mesh(new THREE.TorusGeometry(1.02, 0.34, 20, 44), bodyMat);
+    tor.position.y = 1.38;
+    const edge = new THREE.Mesh(new THREE.TorusGeometry(1.02, 0.08, 12, 42), accentMat);
+    edge.position.y = 1.38;
+    group.add(tor, edge);
+  } else if (character.kind === "book") {
+    const book = new THREE.Mesh(new THREE.BoxGeometry(1.75, 2.25, 0.72), bodyMat);
+    book.position.y = 1.38;
+    const spine = new THREE.Mesh(new THREE.BoxGeometry(0.32, 2.25, 0.75), accentMat);
+    spine.position.set(-0.72, 1.38, 0.02);
+    group.add(book, spine);
+  } else {
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(1.05, 24, 24), bodyMat);
+    ball.position.y = 1.4;
+    const stripe = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.1, 10, 42), accentMat);
+    stripe.rotation.x = Math.PI / 2;
+    stripe.position.y = 1.4;
+    group.add(ball, stripe);
   }
-  return stars;
+
+  const eyeGeo = new THREE.SphereGeometry(0.08, 12, 12);
+  const eyeL = new THREE.Mesh(eyeGeo, darkMat);
+  const eyeR = new THREE.Mesh(eyeGeo, darkMat);
+  eyeL.position.set(-0.24, 1.55, 0.92);
+  eyeR.position.set(0.24, 1.55, 0.92);
+
+  const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.03, 10, 24, Math.PI), darkMat);
+  mouth.position.set(0, 1.22, 0.93);
+  mouth.rotation.z = Math.PI;
+
+  group.add(eyeL, eyeR, mouth);
+  group.scale.setScalar(scale);
+  return group;
+}
+
+function setPlayerCharacter(character) {
+  state.selected = character;
+  if (playerMesh) scene.remove(playerMesh);
+  playerMesh = makeCharacterMesh(character, 0.92);
+  playerMesh.position.set(player.x, player.y, world.playerZ);
+  scene.add(playerMesh);
+}
+
+function setHostCharacter() {
+  if (hostMesh) scene.remove(hostMesh);
+  hostMesh = makeCharacterMesh(state.host, 0.65);
+  hostMesh.position.set(5.8, 3.6, -8.2);
+  scene.add(hostMesh);
+}
+
+function refreshCharacterButtons() {
+  if (!characterButtons) return;
+  characterButtons.innerHTML = "";
+
+  characterPool.forEach(character => {
+    const btn = document.createElement("button");
+    btn.className = "char-btn";
+    btn.type = "button";
+    btn.textContent = character.label;
+    if (character.id === state.selected.id) btn.classList.add("active");
+
+    btn.addEventListener("click", () => {
+      state.selected = character;
+      setPlayerCharacter(character);
+      [...characterButtons.querySelectorAll(".char-btn")].forEach(node => node.classList.remove("active"));
+      btn.classList.add("active");
+      updateCreatorStatus(`Selected ${character.label}.`);
+    });
+
+    characterButtons.appendChild(btn);
+  });
+}
+
+function addCustomCharacter() {
+  if (characterPool.length >= 60) {
+    updateCreatorStatus("Character limit reached. Press Reset to clear gameplay and keep characters.");
+    return;
+  }
+
+  const typed = customNameInput ? customNameInput.value.trim().slice(0, 20) : "";
+  const label = typed || `My Character ${getCustomCharacters().length + 1}`;
+
+  const character = {
+    id: makeCharacterId(label),
+    label,
+    kind: customShapeSelect ? customShapeSelect.value : "ball",
+    main: customMainInput ? customMainInput.value : "#ffd66e",
+    accent: customAccentInput ? customAccentInput.value : "#5ac8ff",
+    custom: true
+  };
+
+  characterPool.push(character);
+  saveCustomCharacters();
+  refreshCharacterButtons();
+  setPlayerCharacter(character);
+  updateCreatorStatus(`Added ${label}.`);
+  updateRecordStatus(`Character ${label} added.`);
+  if (customNameInput) customNameInput.value = "";
+}
+
+function handleAddCharacterPress(e) {
+  if (e) e.preventDefault();
+  const now = Date.now();
+  if (now - lastAddPressAt < 220) return;
+  lastAddPressAt = now;
+  addCustomCharacter();
+}
+
+function updateHUD() {
+  const challenge = currentChallenge();
+  setElText(scoreEl, String(state.score));
+  setElText(timeEl, String(Math.max(0, Math.ceil(state.timeLeft))));
+  setElText(heartsEl, String(state.hearts));
+  setElText(hostNameEl, state.host.name);
+  setElText(challengeNameEl, challenge.title);
+
+  if (challenge.key === "collect") {
+    setElText(challengeInfoEl, `Challenge ${state.challengeIndex + 1}: Collect ${state.challengeProgress}/${challenge.goal} stars.`);
+  } else if (challenge.key === "survive") {
+    setElText(challengeInfoEl, `Challenge ${state.challengeIndex + 1}: Survive. Time left ${Math.max(0, Math.ceil(state.timeLeft))}s.`);
+  } else {
+    setElText(challengeInfoEl, `Final Challenge: Reach score ${challenge.goal}. Current score ${state.score}.`);
+  }
+}
+
+function showPulse(text, ms = 1300) {
+  setMessage(text);
+  if (pulseTimer) clearTimeout(pulseTimer);
+  pulseTimer = setTimeout(() => {
+    if (state.running) setMessage("");
+    pulseTimer = null;
+  }, ms);
+}
+
+function clearPickups() {
+  state.pickups.forEach(item => scene.remove(item.mesh));
+  state.pickups = [];
 }
 
 function spawnPickup() {
   const challenge = currentChallenge();
-  const bad = Math.random() < challenge.badRate;
+  const isBad = Math.random() < challenge.badRate;
+
+  const geo = isBad
+    ? new THREE.SphereGeometry(0.35, 16, 16)
+    : new THREE.IcosahedronGeometry(0.34, 0);
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: isBad ? "#ff4f5e" : "#ffe45f",
+    emissive: isBad ? "#5c0c16" : "#4a3f08",
+    emissiveIntensity: 0.5,
+    roughness: 0.35,
+    metalness: 0.25
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set((Math.random() * 8) - 4, isBad ? 0.9 : 1.35, -78 - Math.random() * 16);
+  scene.add(mesh);
+
   state.pickups.push({
-    x: Math.random() * (viewW - 80) + 40,
-    y: -18,
-    r: bad ? 16 : 14,
-    vy: bad ? 220 : 180,
-    kind: bad ? "bad" : "good"
+    kind: isBad ? "bad" : "good",
+    mesh,
+    spinX: (Math.random() - 0.5) * 5,
+    spinY: (Math.random() - 0.5) * 5
   });
 }
 
-function update(dt) {
+function startChallenge(index) {
+  state.challengeIndex = index;
+  state.challengeProgress = 0;
+  state.timeLeft = CHALLENGES[index].duration;
+  state.spawnAccumulator = 0;
+  clearPickups();
+  setHostLine(`${state.host.line} Now: ${CHALLENGES[index].title}.`);
+  updateHUD();
+  showPulse(`Round ${index + 1}: ${CHALLENGES[index].title}`);
+}
+
+function advanceChallenge() {
+  if (state.challengeIndex >= CHALLENGES.length - 1) {
+    endGame(`You won all challenges! Final score: ${state.score}`);
+    return;
+  }
+  startChallenge(state.challengeIndex + 1);
+}
+
+function endGame(text) {
+  state.running = false;
+  state.over = true;
+  setMessage(text);
+}
+
+function resetGame() {
+  if (pulseTimer) {
+    clearTimeout(pulseTimer);
+    pulseTimer = null;
+  }
+
+  state.running = false;
+  state.over = false;
+  state.score = 0;
+  state.hearts = 3;
+  state.challengeIndex = 0;
+  state.challengeProgress = 0;
+  state.timeLeft = CHALLENGES[0].duration;
+  state.spawnAccumulator = 0;
+  chooseHost();
+  setHostCharacter();
+  clearPickups();
+
+  player.x = 0;
+  player.y = 1;
+  player.vx = 0;
+  player.vy = 0;
+  player.onGround = true;
+  player.flyFuel = player.maxFlyFuel;
+
+  controls.left = false;
+  controls.right = false;
+  controls.jump = false;
+  controls.jumpQueued = false;
+
+  setHostLine(`${state.host.line} Pick your character and tap Start.`);
+  setMessage("Tap Start to play");
+  updateHUD();
+}
+
+function startGame() {
+  if (state.running) return;
+  if (state.over) resetGame();
+  state.running = true;
+  startChallenge(state.challengeIndex);
+}
+
+function recycleRoad(dt) {
+  const shift = state.worldSpeed * dt;
+  const totalLength = world.segmentLength * world.segmentCount;
+
+  world.segments.forEach(segment => {
+    segment.road.position.z += shift;
+    segment.leftGrass.position.z += shift;
+    segment.rightGrass.position.z += shift;
+
+    if (segment.road.position.z > world.segmentLength) {
+      segment.road.position.z -= totalLength;
+      segment.leftGrass.position.z -= totalLength;
+      segment.rightGrass.position.z -= totalLength;
+    }
+  });
+}
+
+function updatePlayer(dt) {
+  player.vx = 0;
+  if (controls.left) player.vx -= player.moveSpeed;
+  if (controls.right) player.vx += player.moveSpeed;
+
+  if (controls.jumpQueued && player.onGround) {
+    player.vy = player.jumpPower;
+    player.onGround = false;
+    controls.jumpQueued = false;
+  }
+
+  if (controls.jump && !player.onGround && player.flyFuel > 0) {
+    player.vy += 17 * dt;
+    player.flyFuel -= 1.8 * dt;
+    if (player.flyFuel < 0) player.flyFuel = 0;
+  }
+
+  player.vy += player.gravity * dt;
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+
+  if (player.y <= 1) {
+    player.y = 1;
+    player.vy = 0;
+    player.onGround = true;
+    player.flyFuel = Math.min(player.maxFlyFuel, player.flyFuel + 2.2 * dt);
+  }
+
+  player.x = Math.max(world.laneMin, Math.min(world.laneMax, player.x));
+}
+
+function intersectsPickup(item) {
+  const dx = player.x - item.mesh.position.x;
+  const dy = player.y - item.mesh.position.y;
+  const dz = world.playerZ - item.mesh.position.z;
+  return (dx * dx + dy * dy + dz * dz) < 1.2;
+}
+
+function updatePickups(dt) {
+  const challenge = currentChallenge();
+  const move = state.worldSpeed * dt;
+
+  for (let i = state.pickups.length - 1; i >= 0; i -= 1) {
+    const item = state.pickups[i];
+    item.mesh.position.z += move;
+    item.mesh.rotation.x += item.spinX * dt;
+    item.mesh.rotation.y += item.spinY * dt;
+
+    if (intersectsPickup(item)) {
+      if (item.kind === "good") {
+        state.score += 1;
+        if (challenge.key === "collect") state.challengeProgress += 1;
+      } else {
+        state.hearts -= 1;
+        showPulse("Ouch!", 500);
+      }
+      scene.remove(item.mesh);
+      state.pickups.splice(i, 1);
+      continue;
+    }
+
+    if (item.mesh.position.z > 14) {
+      scene.remove(item.mesh);
+      state.pickups.splice(i, 1);
+    }
+  }
+}
+
+function updateGame(dt) {
   if (!state.running) return;
   const challenge = currentChallenge();
 
@@ -338,420 +627,58 @@ function update(dt) {
     state.timeLeft = 0;
     if (challenge.key === "survive") {
       advanceChallenge();
-      renderHUD();
+      updateHUD();
       return;
     }
     endGame(`Challenge failed: ${challenge.title}`);
-    renderHUD();
+    updateHUD();
     return;
   }
 
-  state.elapsedSpawn += dt;
-  if (state.elapsedSpawn > challenge.spawnInterval) {
-    state.elapsedSpawn = 0;
+  state.spawnAccumulator += dt;
+  if (state.spawnAccumulator > challenge.spawnInterval) {
+    state.spawnAccumulator = 0;
     spawnPickup();
   }
 
-  player.vx = 0;
-  if (controls.left) player.vx -= player.moveSpeed;
-  if (controls.right) player.vx += player.moveSpeed;
-
-  if (controls.jumpQueued && player.onGround) {
-    player.vy = -player.jumpPower;
-    player.onGround = false;
-    controls.jumpQueued = false;
-  }
-
-  if (controls.jump && !player.onGround && player.flyFuel > 0) {
-    player.vy -= 950 * dt;
-    player.flyFuel -= 65 * dt;
-    if (player.flyFuel < 0) player.flyFuel = 0;
-  }
-
-  player.vy += player.gravity * dt;
-  player.x += player.vx * dt;
-  player.y += player.vy * dt;
-
-  const floor = groundY() - player.h;
-  if (player.y >= floor) {
-    player.y = floor;
-    player.vy = 0;
-    player.onGround = true;
-    player.flyFuel = Math.min(player.maxFlyFuel, player.flyFuel + 70 * dt);
-  }
-
-  player.x = clamp(player.x, 24, viewW - player.w - 24);
-
-  for (let i = state.pickups.length - 1; i >= 0; i -= 1) {
-    const p = state.pickups[i];
-    p.y += p.vy * dt;
-
-    if (intersects(player, p)) {
-      if (p.kind === "good") {
-        state.score += 1;
-        if (challenge.key === "collect") {
-          state.challengeProgress += 1;
-        }
-      } else {
-        state.hearts -= 1;
-        state.shake = 0.28;
-      }
-      state.pickups.splice(i, 1);
-      continue;
-    }
-
-    if (p.y > viewH + 30) {
-      state.pickups.splice(i, 1);
-    }
-  }
+  updatePlayer(dt);
+  recycleRoad(dt);
+  updatePickups(dt);
 
   if (state.hearts <= 0) {
     endGame("Out of hearts. Try again!");
-    renderHUD();
+    updateHUD();
     return;
   }
 
   if (challenge.key === "collect" && state.challengeProgress >= challenge.goal) {
     advanceChallenge();
-    renderHUD();
+    updateHUD();
     return;
   }
 
   if (challenge.key === "final" && state.score >= challenge.goal) {
     advanceChallenge();
-    renderHUD();
+    updateHUD();
     return;
   }
 
-  if (state.shake > 0) {
-    state.shake -= dt;
-    if (state.shake < 0) state.shake = 0;
+  updateHUD();
+}
+
+function renderScene(dt) {
+  if (playerMesh) {
+    playerMesh.position.set(player.x, player.y, world.playerZ);
+    playerMesh.rotation.y = player.vx < -0.1 ? 0.2 : player.vx > 0.1 ? -0.2 : 0;
   }
 
-  renderHUD();
-}
-
-function draw() {
-  const shakeX = state.shake > 0 ? (Math.random() - 0.5) * 12 : 0;
-  const shakeY = state.shake > 0 ? (Math.random() - 0.5) * 8 : 0;
-
-  ctx.save();
-  ctx.translate(shakeX, shakeY);
-
-  drawBackground();
-  drawFloor();
-
-  state.pickups.forEach(drawPickup);
-  drawPlayer();
-  drawFlyBar();
-  drawHost();
-
-  ctx.restore();
-}
-
-function drawBackground() {
-  const g = ctx.createLinearGradient(0, 0, 0, viewH);
-  g.addColorStop(0, "#72d8ff");
-  g.addColorStop(0.6, "#b8f9d5");
-  g.addColorStop(1, "#d5ffd8");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, viewW, viewH);
-
-  ctx.fillStyle = "#fff4a5";
-  ctx.beginPath();
-  ctx.arc(viewW - 116, 110, 52, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "#ffffffb6";
-  state.stars.forEach(s => {
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.s, 0, Math.PI * 2);
-    ctx.fill();
-    s.x += s.drift;
-    if (s.x < -5) s.x = viewW + 5;
-    if (s.x > viewW + 5) s.x = -5;
-  });
-}
-
-function drawFloor() {
-  const y = groundY();
-  ctx.fillStyle = "#2f9a5f";
-  ctx.fillRect(0, y, viewW, viewH - y);
-
-  ctx.fillStyle = "#44b26f";
-  for (let i = 0; i < viewW; i += 46) {
-    ctx.fillRect(i, y - 4, 24, 6);
-  }
-}
-
-function drawPlayer() {
-  drawCharacter(state.selected.kind, player.x, player.y, player.w, player.h, state.selected.main, state.selected.accent);
-
-  ctx.strokeStyle = "#111";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.arc(player.x + player.w * 0.36, player.y + player.h * 0.4, 3.4, 0, Math.PI * 2);
-  ctx.arc(player.x + player.w * 0.66, player.y + player.h * 0.4, 3.4, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(player.x + player.w * 0.5, player.y + player.h * 0.52, 12, 0.16, Math.PI - 0.16, false);
-  ctx.stroke();
-}
-
-function drawFlyBar() {
-  const x = 18;
-  const y = 16;
-  const w = 160;
-  const h = 18;
-  const t = player.flyFuel / player.maxFlyFuel;
-
-  ctx.fillStyle = "#ffffffb5";
-  roundRect(ctx, x, y, w, h, 9, true, false);
-  ctx.fillStyle = "#6f42d8";
-  roundRect(ctx, x + 2, y + 2, (w - 4) * t, h - 4, 7, true, false);
-  ctx.fillStyle = "#112344";
-  ctx.font = "700 12px Fredoka";
-  ctx.fillText("Fly", x + w + 8, y + 13);
-}
-
-function drawHost() {
-  const x = viewW - 124;
-  const y = 24;
-  const w = 74;
-  const h = 76;
-  drawCharacter(state.host.kind, x, y, w, h, state.host.main, state.host.accent);
-
-  ctx.strokeStyle = "#102038";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(x + w * 0.36, y + h * 0.42, 2.7, 0, Math.PI * 2);
-  ctx.arc(x + w * 0.66, y + h * 0.42, 2.7, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(x + w * 0.5, y + h * 0.55, 10, 0.2, Math.PI - 0.2, false);
-  ctx.stroke();
-
-  ctx.fillStyle = "#ffffffd6";
-  roundRect(ctx, x - 194, y + 4, 184, 42, 10, true, false);
-  ctx.fillStyle = "#153a5f";
-  ctx.font = "700 12px Fredoka";
-  const bubble = state.running ? currentChallenge().title : "Press Start";
-  ctx.fillText(`${state.host.name}: ${bubble}`, x - 186, y + 29);
-}
-
-function drawPickup(p) {
-  if (p.kind === "good") {
-    ctx.fillStyle = "#ffe34f";
-    drawStar(p.x, p.y, p.r, 5);
-    ctx.fill();
-  } else {
-    ctx.fillStyle = "#ff4f5e";
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(p.x - 7, p.y - 7);
-    ctx.lineTo(p.x + 7, p.y + 7);
-    ctx.moveTo(p.x + 7, p.y - 7);
-    ctx.lineTo(p.x - 7, p.y + 7);
-    ctx.stroke();
-  }
-}
-
-function drawCharacter(kind, x, y, w, h, main, accent) {
-  ctx.save();
-  ctx.fillStyle = main;
-  ctx.strokeStyle = "#7897ac";
-  ctx.lineWidth = 3;
-
-  if (kind === "tube") {
-    roundRect(ctx, x + 8, y + 4, w - 16, h - 14, 18, true, true);
-    ctx.fillStyle = accent;
-    roundRect(ctx, x + 16, y - 6, w - 32, 20, 8, true, false);
-    ctx.fillStyle = "#4acdf0";
-    roundRect(ctx, x + 11, y + h - 17, w - 22, 14, 5, true, false);
-  } else if (kind === "tree") {
-    ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.moveTo(x + w * 0.5, y + 10);
-    ctx.lineTo(x + 8, y + h - 16);
-    ctx.lineTo(x + w - 8, y + h - 16);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = main;
-    ctx.beginPath();
-    ctx.moveTo(x + w * 0.5, y + 2);
-    ctx.lineTo(x + 2, y + h - 20);
-    ctx.lineTo(x + w - 2, y + h - 20);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#9dbe62";
-    roundRect(ctx, x + w * 0.46, y + h * 0.38, 8, h * 0.52, 3, true, false);
-  } else if (kind === "frame") {
-    ctx.fillStyle = "#fff";
-    roundRect(ctx, x + 6, y + 2, w - 12, h - 10, 8, true, true);
-    ctx.fillStyle = accent;
-    roundRect(ctx, x + 11, y + 7, w - 22, h * 0.45, 4, true, false);
-    ctx.fillStyle = main;
-    roundRect(ctx, x + 11, y + h * 0.45, w - 22, h * 0.39, 4, true, false);
-    ctx.fillStyle = "#ffe065";
-    ctx.beginPath();
-    ctx.arc(x + w * 0.72, y + h * 0.63, 9, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (kind === "ring") {
-    ctx.fillStyle = main;
-    ctx.beginPath();
-    ctx.arc(x + w / 2, y + h / 2, w * 0.43, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#fff4d1";
-    ctx.beginPath();
-    ctx.arc(x + w / 2, y + h / 2, w * 0.22, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(x + w / 2, y + h / 2, w * 0.42, 0, Math.PI * 2);
-    ctx.stroke();
-  } else if (kind === "book") {
-    ctx.fillStyle = main;
-    roundRect(ctx, x + 9, y + 4, w - 16, h - 12, 7, true, true);
-    ctx.fillStyle = accent;
-    roundRect(ctx, x + 9, y + 4, 16, h - 12, 4, true, false);
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x + w - 13, y + 12);
-    ctx.lineTo(x + w - 13, y + h - 13);
-    ctx.stroke();
-  } else {
-    const g = ctx.createRadialGradient(x + w * 0.34, y + h * 0.3, 7, x + w * 0.5, y + h * 0.5, w * 0.5);
-    g.addColorStop(0, main);
-    g.addColorStop(1, accent);
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x + w / 2, y + h / 2, w * 0.45, 0, Math.PI * 2);
-    ctx.fill();
+  if (hostMesh) {
+    hostMesh.rotation.y += dt * 0.7;
   }
 
-  ctx.restore();
-}
-
-function roundRect(c, x, y, w, h, r, fill, stroke) {
-  c.beginPath();
-  c.moveTo(x + r, y);
-  c.lineTo(x + w - r, y);
-  c.quadraticCurveTo(x + w, y, x + w, y + r);
-  c.lineTo(x + w, y + h - r);
-  c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  c.lineTo(x + r, y + h);
-  c.quadraticCurveTo(x, y + h, x, y + h - r);
-  c.lineTo(x, y + r);
-  c.quadraticCurveTo(x, y, x + r, y);
-  c.closePath();
-  if (fill) c.fill();
-  if (stroke) c.stroke();
-}
-
-function drawStar(x, y, r, points) {
-  const step = Math.PI / points;
-  ctx.beginPath();
-  ctx.moveTo(x, y - r);
-  for (let i = 0; i < points * 2; i += 1) {
-    const rad = i % 2 === 0 ? r : r * 0.48;
-    const a = i * step - Math.PI / 2;
-    ctx.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad);
-  }
-  ctx.closePath();
-}
-
-function intersects(rect, c) {
-  const cx = clamp(c.x, rect.x, rect.x + rect.w);
-  const cy = clamp(c.y, rect.y, rect.y + rect.h);
-  const dx = c.x - cx;
-  const dy = c.y - cy;
-  return dx * dx + dy * dy < c.r * c.r;
-}
-
-function clamp(v, min, max) {
-  return Math.max(min, Math.min(max, v));
-}
-
-function onPress(key, active) {
-  controls[key] = active;
-  if (key === "jump" && active) {
-    controls.jumpQueued = true;
-  }
-}
-
-function bindHoldButton(btn, key) {
-  const down = e => {
-    e.preventDefault();
-    onPress(key, true);
-  };
-  const up = e => {
-    e.preventDefault();
-    onPress(key, false);
-  };
-
-  btn.addEventListener("pointerdown", down);
-  btn.addEventListener("pointerup", up);
-  btn.addEventListener("pointerleave", up);
-  btn.addEventListener("pointercancel", up);
-  btn.addEventListener("touchstart", down, { passive: false });
-  btn.addEventListener("touchend", up, { passive: false });
-}
-
-function makeCharacterButtons() {
-  characterButtons.innerHTML = "";
-  characterPool.forEach(character => {
-    const btn = document.createElement("button");
-    btn.className = "char-btn";
-    btn.textContent = character.label;
-    btn.type = "button";
-    if (character.id === state.selected.id) {
-      btn.classList.add("active");
-    }
-
-    btn.addEventListener("click", () => {
-      state.selected = character;
-      [...characterButtons.querySelectorAll(".char-btn")].forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-    });
-
-    characterButtons.appendChild(btn);
-  });
-}
-
-function addCustomCharacter() {
-  if (characterPool.length >= 30) {
-    updateRecordStatus("Character limit reached. Refresh to clear and add more.");
-    return;
-  }
-
-  const label = customNameInput.value.trim().slice(0, 20);
-  if (!label) {
-    updateRecordStatus("Type a character name first.");
-    return;
-  }
-
-  const character = {
-    id: makeCharacterId(label),
-    label,
-    kind: customShapeSelect.value,
-    main: customMainInput.value,
-    accent: customAccentInput.value,
-    custom: true
-  };
-
-  characterPool.push(character);
-  state.selected = character;
-  saveCustomCharacters();
-  makeCharacterButtons();
-  updateRecordStatus(`Character "${label}" added.`);
-  customNameInput.value = "";
+  camera.position.x += (player.x * 0.18 - camera.position.x) * Math.min(1, dt * 6);
+  camera.lookAt(player.x * 0.35, 1.5, 0);
+  renderer.render(scene, camera);
 }
 
 function recordingMimeType() {
@@ -762,17 +689,17 @@ function recordingMimeType() {
     "video/webm"
   ];
   for (const type of types) {
-    if (window.MediaRecorder && MediaRecorder.isTypeSupported(type)) {
-      return type;
-    }
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(type)) return type;
   }
   return "";
 }
 
 function setRecordingUi(isRecording) {
   recording = isRecording;
-  recordBtn.classList.toggle("active", isRecording);
-  recordBtn.textContent = isRecording ? "Stop Recording" : "Record Video";
+  if (recordBtn) {
+    recordBtn.classList.toggle("active", isRecording);
+    recordBtn.textContent = isRecording ? "Stop Recording" : "Record Video";
+  }
 }
 
 async function finalizeRecording(blob, filename) {
@@ -782,13 +709,13 @@ async function finalizeRecording(blob, filename) {
     try {
       await navigator.share({
         title: "My Object Show Video",
-        text: "I made this game video!",
+        text: "I made this 3D object show video!",
         files: [file]
       });
-      updateRecordStatus("Shared. You can also save it to Photos from the share sheet.");
+      updateRecordStatus("Shared. You can also save it to Photos.");
       return;
     } catch (_err) {
-      // User canceled share; continue to download fallback.
+      // canceled share
     }
   }
 
@@ -797,8 +724,8 @@ async function finalizeRecording(blob, filename) {
   a.href = url;
   a.download = filename;
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1600);
-  updateRecordStatus("Video downloaded. On iPhone: open Files, then Save Video to Photos.");
+  setTimeout(() => URL.revokeObjectURL(url), 1800);
+  updateRecordStatus("Video downloaded. On iPhone you can Save Video to Photos.");
 }
 
 function startRecording() {
@@ -814,8 +741,8 @@ function startRecording() {
     mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
     recordedChunks = [];
 
-    mediaRecorder.ondataavailable = e => {
-      if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+    mediaRecorder.ondataavailable = ev => {
+      if (ev.data && ev.data.size > 0) recordedChunks.push(ev.data);
     };
 
     mediaRecorder.onstop = () => {
@@ -823,9 +750,8 @@ function startRecording() {
       const outputType = mediaRecorder.mimeType || "video/mp4";
       const ext = outputType.includes("mp4") ? "mp4" : "webm";
       const blob = new Blob(recordedChunks, { type: outputType });
-      const filename = `object-show-video-${Date.now()}.${ext}`;
       setRecordingUi(false);
-      finalizeRecording(blob, filename);
+      finalizeRecording(blob, `object-show-3d-${Date.now()}.${ext}`);
     };
 
     mediaRecorder.start(120);
@@ -833,7 +759,7 @@ function startRecording() {
     updateRecordStatus("Recording... tap Stop Recording when done.");
   } catch (_err) {
     setRecordingUi(false);
-    updateRecordStatus("Could not start recording. Try Safari on iPhone.");
+    updateRecordStatus("Could not start recording. Use Safari on iPhone.");
   }
 }
 
@@ -845,77 +771,105 @@ function stopRecording() {
   }
 }
 
-function resizeCanvas() {
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
-  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-  viewW = w;
-  viewH = h;
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  if (!state.running) {
-    player.y = groundY() - player.h;
-    state.stars = makeStars();
-  }
+function onPress(key, active) {
+  controls[key] = active;
+  if (key === "jump" && active) controls.jumpQueued = true;
 }
 
+function bindHoldButton(btn, key) {
+  if (!btn) return;
+
+  const down = ev => {
+    ev.preventDefault();
+    onPress(key, true);
+  };
+
+  const up = ev => {
+    ev.preventDefault();
+    onPress(key, false);
+  };
+
+  btn.addEventListener("pointerdown", down);
+  btn.addEventListener("pointerup", up);
+  btn.addEventListener("pointerleave", up);
+  btn.addEventListener("pointercancel", up);
+  btn.addEventListener("touchstart", down, { passive: false });
+  btn.addEventListener("touchend", up, { passive: false });
+}
+
+function onResize() {
+  const w = Math.max(320, canvas.clientWidth || 960);
+  const h = Math.max(180, canvas.clientHeight || 540);
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+let lastTs = performance.now();
 function loop(ts) {
-  const dt = Math.min(0.032, (ts - lastTs) / 1000 || 0);
+  const dt = Math.min(0.05, (ts - lastTs) / 1000 || 0.016);
   lastTs = ts;
 
-  update(dt);
-  draw();
+  updateGame(dt);
+  renderScene(dt);
 
   requestAnimationFrame(loop);
 }
 
-window.addEventListener("keydown", e => {
-  if (["ArrowLeft", "ArrowRight", "ArrowUp", " "].includes(e.key)) {
-    e.preventDefault();
-  }
-  if (e.key === "ArrowLeft") onPress("left", true);
-  if (e.key === "ArrowRight") onPress("right", true);
-  if (e.key === "ArrowUp" || e.key === " ") onPress("jump", true);
+window.addEventListener("keydown", ev => {
+  if (["ArrowLeft", "ArrowRight", "ArrowUp", " "].includes(ev.key)) ev.preventDefault();
+  if (ev.key === "ArrowLeft") onPress("left", true);
+  if (ev.key === "ArrowRight") onPress("right", true);
+  if (ev.key === "ArrowUp" || ev.key === " ") onPress("jump", true);
 });
 
-window.addEventListener("keyup", e => {
-  if (e.key === "ArrowLeft") onPress("left", false);
-  if (e.key === "ArrowRight") onPress("right", false);
-  if (e.key === "ArrowUp" || e.key === " ") onPress("jump", false);
+window.addEventListener("keyup", ev => {
+  if (ev.key === "ArrowLeft") onPress("left", false);
+  if (ev.key === "ArrowRight") onPress("right", false);
+  if (ev.key === "ArrowUp" || ev.key === " ") onPress("jump", false);
 });
+
+if (addCharacterBtn) {
+  addCharacterBtn.addEventListener("click", handleAddCharacterPress);
+  addCharacterBtn.addEventListener("pointerup", handleAddCharacterPress);
+  addCharacterBtn.addEventListener("touchend", handleAddCharacterPress, { passive: false });
+}
+
+if (customNameInput) {
+  customNameInput.addEventListener("keydown", ev => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      addCustomCharacter();
+    }
+  });
+}
+
+if (recordBtn) {
+  recordBtn.addEventListener("click", () => {
+    if (recording) stopRecording();
+    else startRecording();
+  });
+}
+
+if (startBtn) startBtn.addEventListener("click", startGame);
+if (resetBtn) resetBtn.addEventListener("click", resetGame);
 
 bindHoldButton(leftBtn, "left");
 bindHoldButton(rightBtn, "right");
 bindHoldButton(jumpBtn, "jump");
 
-startBtn.addEventListener("click", startGame);
-resetBtn.addEventListener("click", resetGame);
-addCharacterBtn.addEventListener("click", addCustomCharacter);
-customNameInput.addEventListener("keydown", e => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    addCustomCharacter();
-  }
-});
-recordBtn.addEventListener("click", () => {
-  if (recording) {
-    stopRecording();
-  } else {
-    startRecording();
-  }
-});
-
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener("resize", onResize);
 window.addEventListener("beforeunload", () => {
-  if (mediaRecorder && mediaRecorder.state !== "inactive") {
-    mediaRecorder.stop();
-  }
+  if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
 });
 
 loadCustomCharacters();
-makeCharacterButtons();
+makeSkyStars();
+makeRoadSegments();
+chooseHost();
+setPlayerCharacter(state.selected);
+setHostCharacter();
+refreshCharacterButtons();
 resetGame();
-resizeCanvas();
+onResize();
 requestAnimationFrame(loop);

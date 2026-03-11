@@ -220,6 +220,13 @@ body {
   color: #243f65;
 }
 
+.creator-status {
+  margin: 2px 2px 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0e4c83;
+}
+
 .host-line,
 .challenge-info {
   margin: 8px 2px 0;
