@@ -6,6 +6,10 @@ let viewH = 540;
 const scoreEl = document.getElementById("score");
 const timeEl = document.getElementById("time");
 const heartsEl = document.getElementById("hearts");
+const hostNameEl = document.getElementById("hostName");
+const challengeNameEl = document.getElementById("challengeName");
+const hostLineEl = document.getElementById("hostLine");
+const challengeInfoEl = document.getElementById("challengeInfo");
 const startBtn = document.getElementById("startBtn");
 const resetBtn = document.getElementById("resetBtn");
 const recordBtn = document.getElementById("recordBtn");
@@ -34,13 +38,70 @@ let characterPool = [...DEFAULT_CHARACTERS];
 
 const CUSTOM_STORAGE_KEY = "object-show-party-custom-characters-v1";
 
+const HOSTS = [
+  {
+    name: "Cloud Host",
+    line: "Welcome players. Finish all challenges to win the show!",
+    kind: "frame",
+    main: "#f3fdff",
+    accent: "#77c8ff"
+  },
+  {
+    name: "Star Host",
+    line: "Fast hands win this one. Let the challenge begin!",
+    kind: "ball",
+    main: "#ffd365",
+    accent: "#ff8f62"
+  },
+  {
+    name: "Neon Host",
+    line: "Three rounds, one winner. Keep moving!",
+    kind: "tube",
+    main: "#f7f6ff",
+    accent: "#45e29f"
+  }
+];
+
+const CHALLENGES = [
+  {
+    key: "collect",
+    title: "Collect 8 stars",
+    detail: "Challenge 1: Collect 8 stars before time runs out.",
+    duration: 25,
+    goal: 8,
+    spawnInterval: 0.62,
+    badRate: 0.18
+  },
+  {
+    key: "survive",
+    title: "Survive the hazard round",
+    detail: "Challenge 2: Survive while dodging the red danger balls.",
+    duration: 20,
+    goal: 0,
+    spawnInterval: 0.48,
+    badRate: 0.52
+  },
+  {
+    key: "final",
+    title: "Reach score 18",
+    detail: "Final Challenge: Reach total score 18 to win the episode.",
+    duration: 35,
+    goal: 18,
+    spawnInterval: 0.55,
+    badRate: 0.25
+  }
+];
+
 const state = {
   running: false,
   over: false,
   score: 0,
   hearts: 3,
-  timeLeft: 90,
+  timeLeft: CHALLENGES[0].duration,
   selected: characterPool[0],
+  host: HOSTS[0],
+  challengeIndex: 0,
+  challengeProgress: 0,
   elapsedSpawn: 0,
   pickups: [],
   stars: [],
@@ -73,21 +134,29 @@ let lastTs = 0;
 let mediaRecorder = null;
 let recording = false;
 let recordedChunks = [];
+let pulseTimer = null;
 
 function groundY() {
   return viewH - 78;
 }
 
 function resetGame() {
+  if (pulseTimer) {
+    clearTimeout(pulseTimer);
+    pulseTimer = null;
+  }
   state.running = false;
   state.over = false;
   state.score = 0;
   state.hearts = 3;
-  state.timeLeft = 90;
+  state.timeLeft = CHALLENGES[0].duration;
+  state.challengeIndex = 0;
+  state.challengeProgress = 0;
   state.elapsedSpawn = 0;
   state.pickups = [];
   state.stars = makeStars();
   state.shake = 0;
+  chooseHost();
 
   player.x = 110;
   player.y = groundY() - player.h;
@@ -101,6 +170,8 @@ function resetGame() {
   controls.jump = false;
   controls.jumpQueued = false;
 
+  challengeInfoEl.textContent = CHALLENGES[0].detail;
+  setHostLine(`${state.host.line} Pick your character and tap Start.`);
   setMessage("Tap Start to play");
   renderHUD();
 }
@@ -111,7 +182,7 @@ function startGame() {
     resetGame();
   }
   state.running = true;
-  setMessage("");
+  startChallenge(state.challengeIndex);
 }
 
 function endGame(text) {
@@ -121,9 +192,20 @@ function endGame(text) {
 }
 
 function renderHUD() {
+  const challenge = currentChallenge();
   scoreEl.textContent = String(state.score);
   timeEl.textContent = String(Math.max(0, Math.ceil(state.timeLeft)));
   heartsEl.textContent = String(state.hearts);
+  hostNameEl.textContent = state.host.name;
+  challengeNameEl.textContent = challenge.title;
+
+  if (challenge.key === "collect") {
+    challengeInfoEl.textContent = `Challenge ${state.challengeIndex + 1}: Collect ${state.challengeProgress}/${challenge.goal} stars.`;
+  } else if (challenge.key === "survive") {
+    challengeInfoEl.textContent = `Challenge ${state.challengeIndex + 1}: Survive. Time left ${Math.max(0, Math.ceil(state.timeLeft))}s.`;
+  } else {
+    challengeInfoEl.textContent = `Final Challenge: Reach score ${challenge.goal}. Current score ${state.score}.`;
+  }
 }
 
 function setMessage(text) {
@@ -137,6 +219,49 @@ function setMessage(text) {
 
 function updateRecordStatus(text) {
   recordStatus.textContent = text;
+}
+
+function currentChallenge() {
+  return CHALLENGES[state.challengeIndex];
+}
+
+function chooseHost() {
+  state.host = HOSTS[Math.floor(Math.random() * HOSTS.length)];
+}
+
+function setHostLine(text) {
+  hostLineEl.textContent = `Host says: ${text}`;
+}
+
+function showPulse(text, ms = 1300) {
+  setMessage(text);
+  if (pulseTimer) {
+    clearTimeout(pulseTimer);
+  }
+  pulseTimer = setTimeout(() => {
+    if (state.running) setMessage("");
+    pulseTimer = null;
+  }, ms);
+}
+
+function startChallenge(index) {
+  state.challengeIndex = index;
+  state.challengeProgress = 0;
+  state.timeLeft = CHALLENGES[index].duration;
+  state.elapsedSpawn = 0;
+  state.pickups = [];
+  challengeInfoEl.textContent = CHALLENGES[index].detail;
+  setHostLine(`${state.host.line} Now: ${CHALLENGES[index].title}.`);
+  renderHUD();
+  showPulse(`Round ${index + 1}: ${CHALLENGES[index].title}`);
+}
+
+function advanceChallenge() {
+  if (state.challengeIndex >= CHALLENGES.length - 1) {
+    endGame(`You won all challenges! Final score: ${state.score}`);
+    return;
+  }
+  startChallenge(state.challengeIndex + 1);
 }
 
 function makeCharacterId(name) {
@@ -193,7 +318,8 @@ function makeStars() {
 }
 
 function spawnPickup() {
-  const bad = Math.random() < 0.2;
+  const challenge = currentChallenge();
+  const bad = Math.random() < challenge.badRate;
   state.pickups.push({
     x: Math.random() * (viewW - 80) + 40,
     y: -18,
@@ -205,15 +331,23 @@ function spawnPickup() {
 
 function update(dt) {
   if (!state.running) return;
+  const challenge = currentChallenge();
 
   state.timeLeft -= dt;
   if (state.timeLeft <= 0) {
     state.timeLeft = 0;
-    endGame(`Time's up. Score: ${state.score}`);
+    if (challenge.key === "survive") {
+      advanceChallenge();
+      renderHUD();
+      return;
+    }
+    endGame(`Challenge failed: ${challenge.title}`);
+    renderHUD();
+    return;
   }
 
   state.elapsedSpawn += dt;
-  if (state.elapsedSpawn > 0.68) {
+  if (state.elapsedSpawn > challenge.spawnInterval) {
     state.elapsedSpawn = 0;
     spawnPickup();
   }
@@ -255,6 +389,9 @@ function update(dt) {
     if (intersects(player, p)) {
       if (p.kind === "good") {
         state.score += 1;
+        if (challenge.key === "collect") {
+          state.challengeProgress += 1;
+        }
       } else {
         state.hearts -= 1;
         state.shake = 0.28;
@@ -268,12 +405,22 @@ function update(dt) {
     }
   }
 
-  if (state.score >= 35) {
-    endGame("You win the Object Show Party!");
-  }
-
   if (state.hearts <= 0) {
     endGame("Out of hearts. Try again!");
+    renderHUD();
+    return;
+  }
+
+  if (challenge.key === "collect" && state.challengeProgress >= challenge.goal) {
+    advanceChallenge();
+    renderHUD();
+    return;
+  }
+
+  if (challenge.key === "final" && state.score >= challenge.goal) {
+    advanceChallenge();
+    renderHUD();
+    return;
   }
 
   if (state.shake > 0) {
@@ -297,6 +444,7 @@ function draw() {
   state.pickups.forEach(drawPickup);
   drawPlayer();
   drawFlyBar();
+  drawHost();
 
   ctx.restore();
 }
@@ -365,6 +513,31 @@ function drawFlyBar() {
   ctx.fillStyle = "#112344";
   ctx.font = "700 12px Fredoka";
   ctx.fillText("Fly", x + w + 8, y + 13);
+}
+
+function drawHost() {
+  const x = viewW - 124;
+  const y = 24;
+  const w = 74;
+  const h = 76;
+  drawCharacter(state.host.kind, x, y, w, h, state.host.main, state.host.accent);
+
+  ctx.strokeStyle = "#102038";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(x + w * 0.36, y + h * 0.42, 2.7, 0, Math.PI * 2);
+  ctx.arc(x + w * 0.66, y + h * 0.42, 2.7, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x + w * 0.5, y + h * 0.55, 10, 0.2, Math.PI - 0.2, false);
+  ctx.stroke();
+
+  ctx.fillStyle = "#ffffffd6";
+  roundRect(ctx, x - 194, y + 4, 184, 42, 10, true, false);
+  ctx.fillStyle = "#153a5f";
+  ctx.font = "700 12px Fredoka";
+  const bubble = state.running ? currentChallenge().title : "Press Start";
+  ctx.fillText(`${state.host.name}: ${bubble}`, x - 186, y + 29);
 }
 
 function drawPickup(p) {

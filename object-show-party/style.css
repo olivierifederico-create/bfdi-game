@@ -220,6 +220,18 @@ body {
   color: #243f65;
 }
 
+.host-line,
+.challenge-info {
+  margin: 8px 2px 0;
+  font-size: 0.93rem;
+  font-weight: 600;
+  color: #153c66;
+}
+
+.challenge-info {
+  color: #1f4f24;
+}
+
 .controls {
   margin-top: 10px;
   display: grid;

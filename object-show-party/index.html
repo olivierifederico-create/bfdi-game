@@ -17,6 +17,8 @@
         <div class="chip">Score: <span id="score">0</span></div>
         <div class="chip">Time: <span id="time">90</span>s</div>
         <div class="chip">Hearts: <span id="hearts">3</span></div>
+        <div class="chip">Host: <span id="hostName">Cloud Host</span></div>
+        <div class="chip">Challenge: <span id="challengeName">Collect Stars</span></div>
       </div>
     </header>
 
@@ -47,6 +49,8 @@
       <canvas id="arena" width="960" height="540" aria-label="Game arena"></canvas>
       <div class="game-overlay" id="message">Tap Start to play</div>
     </section>
+    <p id="hostLine" class="host-line">Host says: Pick your object, then press Start.</p>
+    <p id="challengeInfo" class="challenge-info">Challenge 1: Collect 8 stars before time runs out.</p>
 
     <section class="actions">
       <button id="startBtn" class="big-btn">Start Game</button>
