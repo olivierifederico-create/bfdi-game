@@ -79,7 +79,6 @@ let mediaRecorder = null;
 let recordedChunks = [];
 let recording = false;
 let pulseTimer = null;
-let lastAddPressAt = 0;
 
 const state = {
   running: false,
@@ -392,25 +391,32 @@ function addCustomCharacter() {
       custom: true
     };
 
-    characterPool.push(character);
+    state.selected = character;
+    characterPool = [character, ...characterPool];
     saveCustomCharacters();
     refreshCharacterButtons();
     setPlayerCharacter(character);
     updateCreatorStatus(`Added ${label}.`);
     updateRecordStatus(`Character ${label} added.`);
     if (customNameInput) customNameInput.value = "";
+
+    if (characterButtons) {
+      const addedBtn = characterButtons.querySelector(".char-btn");
+      if (addedBtn && typeof addedBtn.scrollIntoView === "function") {
+        addedBtn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      }
+    }
   } catch (err) {
-    updateCreatorStatus("Could not add character. Try again.");
+    updateCreatorStatus(`Could not add character. Try again. ${err && err.message ? err.message : ""}`.trim());
   }
 }
 
 function handleAddCharacterPress(e) {
   if (e && typeof e.preventDefault === "function") e.preventDefault();
-  const now = Date.now();
-  if (now - lastAddPressAt < 220) return;
-  lastAddPressAt = now;
+  if (e && typeof e.stopPropagation === "function") e.stopPropagation();
   updateCreatorStatus("Adding character...");
   addCustomCharacter();
+  return false;
 }
 
 function updateHUD() {
@@ -837,6 +843,8 @@ window.addEventListener("keyup", ev => {
 
 if (addCharacterBtn) {
   addCharacterBtn.addEventListener("click", handleAddCharacterPress);
+  addCharacterBtn.addEventListener("touchend", handleAddCharacterPress, { passive: false });
+  addCharacterBtn.addEventListener("pointerup", handleAddCharacterPress);
 }
 
 if (creatorForm) {
