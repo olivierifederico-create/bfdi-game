@@ -238,6 +238,26 @@ const characters = [
     isNew: true,
     bio: "Bouncy ball with quick mobility.",
   },
+  {
+    id: "cookie",
+    name: "Cookie",
+    shape: "cookie",
+    speed: 24.4,
+    radius: 2.15,
+    bonusTime: 2,
+    isNew: true,
+    bio: "Bitten cookie with solid control and extra time.",
+  },
+  {
+    id: "banana",
+    name: "Banana",
+    shape: "banana",
+    speed: 26.1,
+    radius: 1.9,
+    bonusTime: 1,
+    isNew: true,
+    bio: "Curved runner with quick movement and a light hitbox.",
+  },
 ];
 
 const state = {
@@ -493,6 +513,34 @@ const renderer = (() => {
             fallbackCtx.fillStyle = wedge.color;
             fallbackCtx.fill();
           }
+        } else if (character.shape === "cookie") {
+          fallbackCtx.fillStyle = "#b36a20";
+          fallbackCtx.beginPath();
+          fallbackCtx.arc(px, py, r * 1.05, 0, Math.PI * 2);
+          fallbackCtx.fill();
+          fallbackCtx.fillStyle = "#c77e2d";
+          fallbackCtx.beginPath();
+          fallbackCtx.arc(px - r * 0.24, py - r * 0.35, r * 0.24, 0, Math.PI * 2);
+          fallbackCtx.arc(px + r * 0.28, py + r * 0.08, r * 0.2, 0, Math.PI * 2);
+          fallbackCtx.arc(px - r * 0.05, py + r * 0.28, r * 0.18, 0, Math.PI * 2);
+          fallbackCtx.fill();
+          fallbackCtx.fillStyle = "#dfe8f4";
+          fallbackCtx.beginPath();
+          fallbackCtx.arc(px + r * 0.58, py - r * 0.54, r * 0.44, 0, Math.PI * 2);
+          fallbackCtx.fill();
+        } else if (character.shape === "banana") {
+          fallbackCtx.fillStyle = "#ecf31f";
+          fallbackCtx.beginPath();
+          fallbackCtx.moveTo(px - r * 0.72, py - r * 0.86);
+          fallbackCtx.quadraticCurveTo(px + r * 1.1, py - r * 1.4, px + r * 0.96, py + r * 0.6);
+          fallbackCtx.quadraticCurveTo(px + r * 0.62, py + r * 1.38, px - r * 0.62, py + r * 1.05);
+          fallbackCtx.quadraticCurveTo(px - r * 1.0, py + r * 0.22, px - r * 0.72, py - r * 0.86);
+          fallbackCtx.fill();
+          fallbackCtx.fillStyle = "#9d6708";
+          fallbackCtx.beginPath();
+          fallbackCtx.ellipse(px + r * 0.04, py - r * 0.95, r * 0.44, r * 0.24, 0, 0, Math.PI * 2);
+          fallbackCtx.ellipse(px - r * 0.14, py + r * 0.96, r * 0.28, r * 0.2, 0, 0, Math.PI * 2);
+          fallbackCtx.fill();
         } else {
           fallbackCtx.beginPath();
           fallbackCtx.arc(px, py, r, 0, Math.PI * 2);
@@ -507,6 +555,8 @@ const renderer = (() => {
             donut: "#f0dca5",
             book: "#27a8c8",
             "beach-ball": "#f6f8ff",
+            cookie: "#b36a20",
+            banana: "#ecf31f",
             leaf: "#2da44e",
             fire: "#ff7a00",
             bubble: "#8fd8ff",
@@ -1250,6 +1300,8 @@ function drawFacePreview(character) {
     donut: "#f0dca5",
     book: "#27a8c8",
     "beach-ball": "#f6f8ff",
+    cookie: "#b36a20",
+    banana: "#ecf31f",
     leaf: "#2da44e",
     fire: "#ff7a00",
     bubble: "#8fd8ff",
@@ -1368,6 +1420,34 @@ function drawFacePreview(character) {
       ctx.fillStyle = wedge.color;
       ctx.fill();
     }
+  } else if (character.shape === "cookie") {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(90, 56, 40, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#c7812f";
+    ctx.beginPath();
+    ctx.arc(76, 40, 10, 0, Math.PI * 2);
+    ctx.arc(104, 58, 9, 0, Math.PI * 2);
+    ctx.arc(88, 74, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#eef5ff";
+    ctx.beginPath();
+    ctx.arc(114, 28, 17, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (character.shape === "banana") {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(66, 18);
+    ctx.quadraticCurveTo(124, 2, 122, 66);
+    ctx.quadraticCurveTo(115, 104, 70, 96);
+    ctx.quadraticCurveTo(52, 68, 66, 18);
+    ctx.fill();
+    ctx.fillStyle = "#9f6808";
+    ctx.beginPath();
+    ctx.ellipse(88, 14, 22, 10, 0, 0, Math.PI * 2);
+    ctx.ellipse(72, 94, 15, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
   } else if (character.shape === "teardrop") {
     ctx.beginPath();
     ctx.moveTo(90, 12);
@@ -1383,14 +1463,24 @@ function drawFacePreview(character) {
 
   ctx.fillStyle = "#111";
   let eyeY = 52;
+  let leftEyeX = 78;
+  let rightEyeX = 102;
   if (character.shape === "donut") {
     eyeY = 46;
   } else if (character.shape === "pine-tree") {
     eyeY = 56;
+  } else if (character.shape === "cookie") {
+    eyeY = 50;
+    leftEyeX = 76;
+    rightEyeX = 100;
+  } else if (character.shape === "banana") {
+    eyeY = 48;
+    leftEyeX = 78;
+    rightEyeX = 99;
   }
   ctx.beginPath();
-  ctx.ellipse(78, eyeY, 4.5, 8, 0, 0, Math.PI * 2);
-  ctx.ellipse(102, eyeY, 4.5, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(leftEyeX, eyeY, 4.5, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(rightEyeX, eyeY, 4.5, 8, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = "#111";
@@ -1401,6 +1491,8 @@ function drawFacePreview(character) {
   } else if (character.shape === "syringe-side" || character.shape === "nickel-note") {
     ctx.moveTo(72, 74);
     ctx.lineTo(108, 68);
+  } else if (character.shape === "banana") {
+    ctx.arc(92, 70, 16, 0.2, Math.PI - 0.15);
   } else if (character.shape === "pine-tree") {
     ctx.arc(90, 78, 16, Math.PI * 1.05, Math.PI * 1.95);
   } else if (character.shape === "photo-frame") {
@@ -2568,6 +2660,147 @@ function createBeachBallMesh() {
   return group;
 }
 
+function createCookieMesh() {
+  const group = new THREE.Group();
+
+  const cookieShape = new THREE.Shape();
+  cookieShape.absarc(0, 0, 1.48, 0, Math.PI * 2, false);
+  const bite = new THREE.Path();
+  bite.absarc(0.96, 0.78, 0.48, 0, Math.PI * 2, true);
+  cookieShape.holes.push(bite);
+
+  const body = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(cookieShape, { depth: 0.58, bevelEnabled: false, curveSegments: 30 }),
+    new THREE.MeshStandardMaterial({ color: 0xb36a20, roughness: 0.68 })
+  );
+  body.position.z = -0.28;
+  group.add(body);
+
+  const chips = [
+    [-0.55, 0.62, 0.24],
+    [0.32, 0.2, 0.22],
+    [-0.2, -0.35, 0.2],
+  ];
+  for (const [x, y, size] of chips) {
+    const chip = new THREE.Mesh(
+      new THREE.SphereGeometry(size, 10, 10),
+      new THREE.MeshStandardMaterial({ color: 0xc57e2f, roughness: 0.56 })
+    );
+    chip.position.set(x, y, 0.34);
+    group.add(chip);
+  }
+
+  const eyeGeo = new THREE.SphereGeometry(0.13, 10, 10);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+  leftEye.position.set(-0.4, 0.2, 0.36);
+  const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+  rightEye.position.set(0.28, 0.2, 0.36);
+  group.add(leftEye);
+  group.add(rightEye);
+
+  const mouth = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 0.62, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0xf7f9ff, roughness: 0.18 })
+  );
+  mouth.position.set(-0.08, -0.45, 0.38);
+  group.add(mouth);
+
+  addStickLimbs(group, {
+    armY: -0.1,
+    legY: -1.48,
+    armSpread: 1.4,
+    legSpread: 0.5,
+    armLen: 1.12,
+    legLen: 1.15,
+    z: 0.4,
+    radius: 0.055,
+    handRadius: 0.16,
+    footRadius: 0.22,
+  });
+
+  return group;
+}
+
+function createBananaMesh() {
+  const group = new THREE.Group();
+
+  const bananaCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-1.15, -0.85, 0),
+    new THREE.Vector3(-0.38, 0.15, 0.08),
+    new THREE.Vector3(0.42, 1.02, -0.04),
+    new THREE.Vector3(1.22, 0.18, -0.14),
+  ]);
+  const body = new THREE.Mesh(
+    new THREE.TubeGeometry(bananaCurve, 40, 0.5, 18, false),
+    new THREE.MeshStandardMaterial({ color: 0xecf31f, roughness: 0.46 })
+  );
+  group.add(body);
+
+  const highlight = new THREE.Mesh(
+    new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-0.94, -0.66, 0.15),
+        new THREE.Vector3(-0.2, 0.25, 0.2),
+        new THREE.Vector3(0.6, 0.9, 0.08),
+      ]),
+      24,
+      0.13,
+      10,
+      false
+    ),
+    new THREE.MeshStandardMaterial({ color: 0xf6fa74, roughness: 0.34 })
+  );
+  group.add(highlight);
+
+  const topCap = new THREE.Mesh(
+    new THREE.SphereGeometry(0.36, 12, 12),
+    new THREE.MeshStandardMaterial({ color: 0x9d6708, roughness: 0.58 })
+  );
+  topCap.position.set(0.58, 1.22, -0.05);
+  topCap.scale.set(1.45, 0.66, 1.25);
+  group.add(topCap);
+
+  const bottomCap = new THREE.Mesh(
+    new THREE.SphereGeometry(0.27, 12, 12),
+    new THREE.MeshStandardMaterial({ color: 0x9d6708, roughness: 0.58 })
+  );
+  bottomCap.position.set(-1.1, -0.78, 0.06);
+  bottomCap.scale.set(1.2, 0.7, 1.2);
+  group.add(bottomCap);
+
+  const eyeGeo = new THREE.SphereGeometry(0.11, 10, 10);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+  leftEye.position.set(-0.15, 0.35, 0.5);
+  const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+  rightEye.position.set(0.42, 0.33, 0.46);
+  group.add(leftEye);
+  group.add(rightEye);
+
+  const smile = [];
+  for (let i = 0; i <= 10; i += 1) {
+    const t = (i / 10) * Math.PI;
+    smile.push(new THREE.Vector3(-0.02 + Math.cos(t) * 0.45, -0.05 + Math.sin(t) * 0.14, 0.52));
+  }
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(smile), new THREE.LineBasicMaterial({ color: 0x111111 })));
+
+  addStickLimbs(group, {
+    armY: -0.18,
+    legY: -1.26,
+    armSpread: 1.28,
+    legSpread: 0.56,
+    armLen: 1.1,
+    legLen: 1.1,
+    z: 0.54,
+    radius: 0.055,
+    handRadius: 0.16,
+    footRadius: 0.22,
+  });
+
+  return group;
+}
+
 function disposeGroup(group) {
   group.traverse((obj) => {
     if (obj.geometry) {
@@ -2685,6 +2918,12 @@ function createPlayerMesh(character) {
   }
   if (character.shape === "beach-ball") {
     return createBeachBallMesh();
+  }
+  if (character.shape === "cookie") {
+    return createCookieMesh();
+  }
+  if (character.shape === "banana") {
+    return createBananaMesh();
   }
   return createTennisBallMesh();
 }
